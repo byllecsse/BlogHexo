@@ -1,0 +1,108 @@
+<!DOCTYPE html><html lang="en"><head><meta name="generator" content="Hexo 3.9.0"><meta http-equiv="content-type" content="text/html; charset=utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black-translucent" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="description"><title>浅谈衣柜系统 | Hexo</title><link rel="stylesheet" type="text/css" href="/HexoBlog/css/style.css?v=0.0.0"><link rel="stylesheet" type="text/css" href="//lib.baomitu.com/normalize/8.0.1/normalize.min.css"><link rel="stylesheet" type="text/css" href="//lib.baomitu.com/pure/1.0.1/pure-min.css"><link rel="stylesheet" type="text/css" href="//lib.baomitu.com/pure/1.0.1/grids-responsive-min.css"><link rel="stylesheet" href="//lib.baomitu.com/font-awesome/4.7.0/css/font-awesome.min.css"><script type="text/javascript" src="//lib.baomitu.com/jquery/3.4.1/jquery.min.js"></script><link rel="icon" mask sizes="any" href="/HexoBlog/favicon.ico"><link rel="Shortcut Icon" type="image/x-icon" href="/HexoBlog/favicon.ico"><link rel="apple-touch-icon" href="/HexoBlog/apple-touch-icon.png"><link rel="apple-touch-icon-precomposed" href="/HexoBlog/apple-touch-icon.png"><script type="text/javascript" src="//lib.baomitu.com/clipboard.js/2.0.4/clipboard.min.js"></script><script type="text/javascript" src="//lib.baomitu.com/toastr.js/2.1.4/toastr.min.js"></script><link rel="stylesheet" href="//lib.baomitu.com/toastr.js/2.1.4/toastr.min.css"></head><body><div class="body_container"><div id="header"><div class="site-name"><h1 class="hidden">浅谈衣柜系统</h1><a id="logo" href="/HexoBlog/.">Hexo</a><p class="description"></p></div><div id="nav-menu"><a class="current" href="/HexoBlog/."><i class="fa fa-home"> Home</i></a><a href="/HexoBlog/archives/"><i class="fa fa-archive"> Archive</i></a><a href="/HexoBlog/about/"><i class="fa fa-user"> About</i></a><a href="/HexoBlog/atom.xml"><i class="fa fa-rss"> RSS</i></a></div></div><div class="pure-g" id="layout"><div class="pure-u-1 pure-u-md-3-4"><div class="content_container"><div class="post"><h1 class="post-title">浅谈衣柜系统</h1><div class="post-meta">2020-04-10</div><div class="post-content"><p>　　游戏角色换装分为以下几步：</p>
+<p>　　　　1.替换蒙皮网格</p>
+<p>　　　　2.刷新骨骼</p>
+<p>　　　　3.替换材质</p>
+<p>　　上面这种是比较简单的换装，可以实现，但是一般我们为了降低游戏的Draw Call会合并模型的网格，这就需要我们重新计算UV，还要合并贴图和材质。这种复杂的实现分为以下几步：</p>
+<p>　　　　1.替换蒙皮网格（或者直接替换模型换装部位的GameObject，因为合并的时候会合并所有的蒙皮网格，而不会关心它是否属于原来角色身体的一部分，而且如果需要替换的部位有多个配件拥有独立的网格和贴图，那这种方式都可以正常执行。我下面的代码就是直接替换了换装部位的GameObject）</p>
+<p>　　　　2.合并所有蒙皮网格</p>
+<p>　　　　3.刷新骨骼</p>
+<p>　　　　4.附加材质（我下面是获取第一个材质作为默认材质）</p>
+<p>　　　　5.合并贴图（贴图的宽高最好是2的N次方的值）</p>
+<p>　　　　6.重新计算UV</p>
+<h2 id="衣柜系统"><a href="#衣柜系统" class="headerlink" title="衣柜系统"></a>衣柜系统</h2><p>点击主界面-衣柜按钮，打开衣柜主界面，隐藏主界面并关闭click响应，隐藏物品快捷使用；</p>
+<p>在界面代码OnOpen()中调用WardrobeMgr:EnterLockerRoom()进入更衣室；</p>
+<p>加载衣柜专属模型相机和模型灯光，将模型相机和灯光都挂到ObjParent下，将主相机设为lua全局访问：rawset(_G, ‘CameraTransform’, ObjectManager.MainCamera.transform)；</p>
+<p>获取模型的位置和朝向角度，设置相机的目标位置和前向偏转local targetRotation = Quaternion.LookRotation，将摄像机参数传入WardrobeCameraController；</p>
+<p>设置其他模块开关:角色不可点地移动、角色不可键盘移动、隐藏场景摄像机、隐藏hub；</p>
+<p>延迟处理相机景深等参数，并将主角模型隐藏。</p>
+<p>正式处理衣柜相关数据：清空/设置收货人数据，请求服务器积分，获取目标角色已有时装列表，设置模型显示光效；</p>
+<p>处理进入时装更衣室场景信息，清理坐骑模型，释放坐骑特效，重置角色阴影，设置武器显示（格斗家武器较特殊）：</p>
+<ul>
+<li>恢复坐骑材质，模型回收；</li>
+<li>重置动画控制器；</li>
+<li>恢复角色节点位置；</li>
+<li>坐骑乘客=null；</li>
+<li>清理坐骑模型资源（缓存或销毁）；</li>
+<li>坐骑绑点clear；</li>
+<li>各种坐骑参数恢复默认值：<ul>
+<li>IsControl 受控状态</li>
+<li>_mount 坐骑对象</li>
+<li>_master 主人</li>
+<li>_passenger 乘客</li>
+<li>_hasPassenger</li>
+<li>_hasMaster</li>
+<li>_mountAssetPath</li>
+<li>_isMountLoaded</li>
+<li>_mountAnimator</li>
+<li>_curMountAnimatorParamNameSet 当前缓存的mount animator controller的parameter集合</li>
+<li>_bodyMaterialPath 各部件的材质路径</li>
+</ul>
+</li>
+</ul>
+<p>显示时装衣物列表，处理翻页视图UIPageView。</p>
+<br>
+
+<h3 id="翻页视图UIPageView"><a href="#翻页视图UIPageView" class="headerlink" title="翻页视图UIPageView"></a>翻页视图UIPageView</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">namespace UnityEngine.UI</span><br><span class="line">&#123;</span><br><span class="line">    public class UIPageView : MonoBehaviour, IBeginDragHandler, IEndDragHandler</span><br><span class="line">    &#123;</span><br><span class="line">        private ScrollRect rect;                                //滑动组件  </span><br><span class="line">        private float targethorizontal = 0;                     //滑动的起始坐标  </span><br><span class="line">        private bool isDrag = false;                            //是否拖拽结束  </span><br><span class="line">        private List&lt;float&gt; posList = new List&lt;float&gt;();        //求出每页的临界角，页索引从0开始 </span><br><span class="line">        public Action&lt;int&gt; pageChangeEvent;                     //回调给Lua页签变化事件</span><br><span class="line"></span><br><span class="line">        public void OnBeginDrag(PointerEventData eventData)</span><br><span class="line">        &#123;</span><br><span class="line">            // 记录拖拽状态和scrollView初始移动位置</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        public void OnEndDrag(PointerEventData eventData)</span><br><span class="line">        &#123;</span><br><span class="line">            // 计算终末位置所属的pageIndex</span><br><span class="line"></span><br><span class="line">            if(currentPageIndex != index) currentPageIndex = index;</span><br><span class="line">            if(pageChangeEvent!=null) pageChangeEvent(index);   // 通知Lua页签变更</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        private void Update()</span><br><span class="line">        &#123;</span><br><span class="line">            // 对scrollview位置插值动画</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>显示玩家模型用的是InterfaceModel.SetDummyPlayer，这里分为设置赠送时装和自己穿戴的时装模型显示，自己的时装用InterfaceModel.SetPlayer，设置模型属性：</p>
+<ul>
+<li>模型lod</li>
+<li>模型阴影shadowType</li>
+<li>角色光效</li>
+<li>雕塑判断，太阳城雕塑判断</li>
+<li>模型layer</li>
+<li>模型播放待机动画</li>
+</ul>
+<p>设置角色模型，获取模型路径、身体材质路径、武器材质路径、武器模型路径，有数据变更则更新模型显示，模型替换材质，更新灯光和特效，场景模型采样环境光，设置阴影状态，替换shader；</p>
+<p>C# SetModel()，判定模型资源路径有变否则返回，回收旧模型：</p>
+<ul>
+<li>清理部件</li>
+<li>恢复身体和武器材质</li>
+<li>清理渲染节点缓存，被回收了旧不需要缓存材质</li>
+<li>销毁rigidbody</li>
+<li>显示武器 ?</li>
+<li>隐藏身体obj，计入缓存池，如果入池出错则直接Destroy</li>
+<li>还原/恢复animator controller</li>
+</ul>
+<p>设置模型材质SetModelMaterial()，替换的是sharedMaterial，加载assetObject，预先判断该assetObject是否存在，不存在可选同步或异步模式加载bundle，设置引用计数，返回assetObject.asset as Material。<br>assetObject则在Update()中设置自身的加载状态。</p>
+<p>角色添加特效，获取时装上的特效绑点集合{特效绑点，特效名称}，BattleEffectManager.PlayEffectOnActor, 特效播放有自己的一套规则，主角和主角机甲的非受击特效优先播放。</p>
+<p>全部模型特效加载完成后，调用lua回调LoadModelCallback，再设置一些动画播放、武器特效、角色灯光、机甲特效之类的。</p>
+<blockquote>
+<p>目前时装做的比较简单，可能就是换模型换材质，没有深层的重新绑点或者计算蒙皮信息骨骼权重之类的，染色的处理也是换材质换shader。</p>
+</blockquote>
+<br>
+
+<h4 id="关于AssetBundle-LoadFromFileAsync第三个参数offset"><a href="#关于AssetBundle-LoadFromFileAsync第三个参数offset" class="headerlink" title="关于AssetBundle.LoadFromFileAsync第三个参数offset"></a>关于AssetBundle.LoadFromFileAsync第三个参数offset</h4><p>offset: An optional byte offset. This value specifies where to start reading the AssetBundle from.<br>大致意思是LoadFromFileAsync可以支持文件偏移读取AssetBundle，使用这个方法可以快速读取ab资源而且ab本身不会被assetStudio直接打开，虽然不算特别好的‘加密’方案，但是对AssetBundle.LoadFromMemory(Async)的读取速度来说是快很多了，本来任何加密方式在破解大神看来都是云云，没有必要牺牲80%的ab加载时间去拦20%的人。</p>
+<p>文件偏移打包，打包完成后用文件流进行字节偏移处理，每个文件的偏移用自身assetBundleHash，拷贝offset到文件头，再用File.OpenWrite()将全部buffer数据写入.</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">foreach (string bundleName in bundleNames)</span><br><span class="line">&#123;</span><br><span class="line">    string filepath = outputPath + &quot;/&quot; + bundleName;</span><br><span class="line">    // 利用 hashcode 做偏移 </span><br><span class="line">    string hashcode = manifest.GetAssetBundleHash(bundleName).ToString();</span><br><span class="line">    ulong offset = Utility.GetOffset(hashcode);</span><br><span class="line">    if ( offset &gt; 0)</span><br><span class="line">    &#123;</span><br><span class="line">        byte[] filedata = File.ReadAllBytes(filepath);</span><br><span class="line">        int filelen = ((int)offset + filedata.Length);</span><br><span class="line">        byte[] buffer = new byte[filelen];</span><br><span class="line">        copyHead(filedata, buffer, (uint)offset);</span><br><span class="line">        copyTo(filedata, buffer, (uint)offset);</span><br><span class="line">        FileStream fs = File.OpenWrite(filepath);</span><br><span class="line">        fs.Write(buffer, 0, filelen);</span><br><span class="line">        fs.Close();</span><br><span class="line">        offsets  += filepath + &quot; offset:&quot; + offset + &quot;\n&quot;;</span><br><span class="line">    &#125;</span><br><span class="line">    WriteItem(stream, bundleName, filepath, hashcode);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<br>
+
+<p>用异步的方式加载，用Profiler.GetTotalAllocatedMemoryLong()内存计数，AssetBundle.LoadFromFileAsync第二个参数为0表示不进行内容校验，await等待assetBundleRequest完成后，进行assetBundle.LoadAsset</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">// 基于offset加载AssetBundle</span><br><span class="line">async void onLoadWithOffsetClicked()</span><br><span class="line">&#123;</span><br><span class="line">    if (offsetBundle)</span><br><span class="line">        offsetBundle.Unload(true);</span><br><span class="line"></span><br><span class="line">    var current_memory = Profiler.GetTotalAllocatedMemoryLong();</span><br><span class="line">    display_image.texture = null;</span><br><span class="line">    var path = System.IO.Path.Combine(Application.streamingAssetsPath, &quot;assets_previews_offset&quot;);</span><br><span class="line">    var assetBundleRequest = AssetBundle.LoadFromFileAsync(path, 0, offset);</span><br><span class="line">    await assetBundleRequest;</span><br><span class="line">    var texture = assetBundleRequest.assetBundle.LoadAsset&lt;Texture2D&gt;(&quot;download.jpg&quot;);</span><br><span class="line">    display_image.texture = texture;</span><br><span class="line">    offsetBundle = assetBundleRequest.assetBundle;</span><br><span class="line"></span><br><span class="line">    Debug.Log(&quot;Offset Load Complete:&quot; + (Profiler.GetTotalAllocatedMemoryLong() - current_memory));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<br>
+
+<h2 id="坐骑系统"><a href="#坐骑系统" class="headerlink" title="坐骑系统"></a>坐骑系统</h2><p>坐骑面板点选规则和时装一样，跳过直接说坐骑绑点和动画状态机。</p>
+<p>获取坐骑挂点偏移，坐骑gameObject有不同高度，而且人物的座椅位置相对坐骑GameObject又各有偏差，举例小车坐骑的人物挂点在汽车底盘上面一点，而飞兽的人物挂点在坐骑背上，对于飞兽gameObject坐标相对的座椅挂点就在gameObject position后上方一些位置，这就存在挂点偏移，每个坐骑都可能有不同的挂点偏移，这个随坐骑模型的形状、大小而定，人物肯定是挂载在模型的表面位置。</p>
+<p>同样是在C# Actor_Mount.SetMount()设置坐骑绑点参数：</p>
+<ul>
+<li>_mountPoint 人物的坐骑节点名G_zuoqi</li>
+<li>_mountOffset 绑点偏移</li>
+<li>_mountRotation 坐骑旋转</li>
+</ul>
+<p>LoadGameObjectAsync加载坐骑模型回调，检查返回路径与需要加载模型路径匹配、或者当前坐骑模型和需要加载的模型相同；</p>
+<p>初始化坐骑挂点骨骼，根据骨骼名字查找骨骼节点，目前时装骨骼都是在一个层级下面，即肩膀-胳膊-手是同一个层级，这样Transform.GetChild(index)查找起来比较快，如果找不到节点就关联一个骨骼，还是找不到就返回自身位置；</p>
+<p>初始化坐骑渲染部件，先清理渲染节点信息，恢复模型的材质为prefab的公共材质，将子物体内所有标为Tag_Mount的SkinnedMeshRenderer组件，生成对于的RendererNode：</p>
+<ul>
+<li>renderer</li>
+<li>hasMultiMaterial</li>
+<li>sharedMaterial</li>
+</ul>
+<p>更新渲染材质，先记录所使用的材质路径，释放当前使用的已经实例化的材质，做个一容错，如果matPath传入为空，则恢复原材质，再立刻设置为新材质，调用materialUpdateCallBack，<br>更新shader，更新环境光采样；</p>
+<p>坐骑主题加载完毕，<strong>开始绑定坐骑</strong>，将角色模型绑定到坐骑指定绑点上，如果获取绑点失败，则将角色模型绑定到第一个子物体上，绑定这个词听起来高大上，其实就是transform.SetParent()，随后设置上坐骑后的偏移和偏移角度，再重置animator动作，强制刷新实时阴影。</p>
+<p>阴影应该在模型和相机参数完成设置后刷新，Actor_Shadow存在两种阴影类型：圆片阴影+真实阴影。原片阴影挂载角色actor上需要每帧刷新阴影相对actor的偏移位置，真实阴影则是设置shader参数，将角色高度和_propertyShadowOffset传入。</p>
+<br>
+
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><p><a href="https://zhuanlan.zhihu.com/p/75964237" target="_blank" rel="noopener">https://zhuanlan.zhihu.com/p/75964237</a></p>
+</div><div class="tags"></div><div class="post-nav"><a class="pre" href="/HexoBlog/2020/04/11/Unity-降低DrawCall的手段/">降低DrawCall的手段</a><a class="next" href="/HexoBlog/2020/04/10/Lua-Class的实现/">Lua class  实现</a></div></div></div></div><div class="pure-u-1-4 hidden_mid_and_down"><div id="sidebar"><div class="widget"><form class="search-form" action="//www.google.com/search" method="get" accept-charset="utf-8" target="_blank"><input type="text" name="q" maxlength="20" placeholder="Search"><input type="hidden" name="sitesearch" value="http://yoursite.com"></form></div><div class="widget"><div class="widget-title"><i class="fa fa-folder-o"> Categories</i></div></div><div class="widget"><div class="widget-title"><i class="fa fa-star-o"> Tags</i></div><div class="tagcloud"></div></div><div class="widget"><div class="widget-title"><i class="fa fa-file-o"> Recent</i></div><ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/HexoBlog/2020/04/11/Unity-Shader-VectexShader实现水波纹/">用VectexShader实现水波纹</a></li><li class="post-list-item"><a class="post-list-link" href="/HexoBlog/2020/04/11/Unity-Shader-简单SurfaceShader分析/">一个简单SurfaceShader的分析</a></li><li class="post-list-item"><a class="post-list-link" href="/HexoBlog/2020/04/11/Unity-降低DrawCall的手段/">降低DrawCall的手段</a></li><li class="post-list-item"><a class="post-list-link" href="/HexoBlog/2020/04/10/Unity-浅谈衣柜系统/">浅谈衣柜系统</a></li><li class="post-list-item"><a class="post-list-link" href="/HexoBlog/2020/04/10/Lua-Class的实现/">Lua class  实现</a></li><li class="post-list-item"><a class="post-list-link" href="/HexoBlog/2020/04/10/Unity-Shader-模板测试/">Unity 模板测试</a></li><li class="post-list-item"><a class="post-list-link" href="/HexoBlog/2020/02/23/xLua-热更新实现原理/">xLua热更新实现原理</a></li><li class="post-list-item"><a class="post-list-link" href="/HexoBlog/2020/02/20/Lua-Table的内部实现/">Lua table的内部实现</a></li><li class="post-list-item"><a class="post-list-link" href="/HexoBlog/2020/02/19/Lua-与C#交互/">CSharp-Lua-交互</a></li><li class="post-list-item"><a class="post-list-link" href="/HexoBlog/2020/02/18/Unity-AssetBundle基础/">AssetBundle基础</a></li></ul></div><div class="widget"><div class="widget-title"><i class="fa fa-external-link"> Links</i></div><ul></ul><a href="http://www.example1.com/" title="site-name1" target="_blank">site-name1</a><ul></ul><a href="http://www.example2.com/" title="site-name2" target="_blank">site-name2</a><ul></ul><a href="http://www.example3.com/" title="site-name3" target="_blank">site-name3</a></div></div></div><div class="pure-u-1 pure-u-md-3-4"><div id="footer">Copyright © 2020 <a href="/HexoBlog/." rel="nofollow">Hexo.</a> Powered by<a rel="nofollow" target="_blank" href="https://hexo.io"> Hexo.</a><a rel="nofollow" target="_blank" href="https://github.com/tufu9441/maupassant-hexo"> Theme</a> by<a rel="nofollow" target="_blank" href="https://github.com/pagecho"> Cho.</a></div></div></div><a class="show" id="rocket" href="#top"></a><script type="text/javascript" src="/HexoBlog/js/totop.js?v=0.0.0" async></script><script type="text/javascript" src="//lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js" async></script><script type="text/javascript" src="/HexoBlog/js/fancybox.js?v=0.0.0" async></script><link rel="stylesheet" type="text/css" href="//lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css"><script type="text/javascript" src="/js/copycode.js" successtext="Copy Successed!"></script><link rel="stylesheet" type="text/css" href="/css/copycode.css"><script type="text/javascript" src="/HexoBlog/js/codeblock-resizer.js?v=0.0.0"></script><script type="text/javascript" src="/HexoBlog/js/smartresize.js?v=0.0.0"></script></div></body></html>
